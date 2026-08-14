@@ -1,0 +1,13 @@
+{
+  "pythonVersion": "3.14",
+  "venvPath": ".",
+  "venv": ".venv",
+  "include": [
+    "src",
+    "flows"
+  ],
+  "extraPaths": [
+    "src",
+    "c:/Users/utkar/Desktop/churn-etl-pipeline/src"
+  ]
+}
