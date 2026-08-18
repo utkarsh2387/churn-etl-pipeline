@@ -1,6 +1,13 @@
 """
 Orchestrates the full churn ETL pipeline with Prefect:
-Extract -> Transform (AI anomaly detection) -> Load -> AI QA report.
+Extract -> Transform (AI anomaly detection) -> Validate (quality gate)
+-> Load -> AI QA report.
+
+The Validate stage raises DataQualityError and fails the flow (non-zero
+exit code) if output doesn't meet expected row counts, has missing
+columns, duplicate rows, or an anomaly rate outside the expected range.
+This is what fails the GitHub Actions run when something's wrong,
+instead of silently loading bad data.
 
 Run locally:
     python flows/pipeline_flow.py
@@ -20,10 +27,9 @@ from prefect import flow, task
 
 from extract import extract
 from transform import transform
+from validate import validate, DataQualityError
 from load import load
 from ai_report import generate_qa_summary
-
-
 
 
 @task(retries=2, retry_delay_seconds=10)
@@ -34,6 +40,13 @@ def extract_task():
 @task
 def transform_task(df):
     return transform(df)
+
+
+@task
+def validate_task(df):
+    """Fails the flow (and the CI run) if data quality checks don't pass."""
+    validate(df)
+    return df
 
 
 @task
@@ -57,7 +70,8 @@ def report_task(df):
 def churn_pipeline():
     raw_df = extract_task()
     clean_df = transform_task(raw_df)
-    loaded_df = load_task(clean_df)
+    validated_df = validate_task(clean_df)
+    loaded_df = load_task(validated_df)
     report_task(loaded_df)
 
 
